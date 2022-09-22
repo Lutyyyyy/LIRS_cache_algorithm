@@ -1,0 +1,1 @@
+add_executable(LIRS_test LIRS_test.cpp)

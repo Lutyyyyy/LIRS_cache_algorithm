@@ -1,0 +1,1 @@
+add_executable(LIRS_and_ideal_compare LIRS_and_ideal_compare.cpp)
