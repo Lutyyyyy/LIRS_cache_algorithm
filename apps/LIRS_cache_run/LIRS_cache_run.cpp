@@ -5,7 +5,7 @@
 
 
 int main () {
-   
+    
     int hits = 0; 
     int nInputs = 0;
     size_t cache_size = 0;

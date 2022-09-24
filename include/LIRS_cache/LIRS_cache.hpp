@@ -19,10 +19,11 @@ int test_cache (size_t cache_size, int nKeys, int* arr);
 
 template <typename Page_t, typename KeyT = int> struct cache_t {
     
-    enum Status_ {LIR = 1, HIR = 2};
+    const int LIR = 1, HIR = 2;
     const int ERROR = -1, FULL = -2;
+    const float HIR_blocks_percentage_coeff = 0.1;
 
-    using T         = typename std::pair <KeyT, Status_>;
+    using T         = typename std::pair <KeyT, int>;
     using List_Iter = typename std::list<T>::iterator;
 
 
@@ -31,11 +32,11 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     struct Page_status_and_iterators {
         
         Page_t page;
-        enum Status_ status;
+        int status;
         List_Iter S_list_iter;
         List_Iter HIR_list_iter;
 
-        Page_status_and_iterators (Page_t page_, enum Status_ status_, List_Iter S_list_iter_, List_Iter HIR_list_iter_) {
+        Page_status_and_iterators (Page_t page_, int status_, List_Iter S_list_iter_, List_Iter HIR_list_iter_) {
             page = page_;
             status = status_;
             S_list_iter = S_list_iter_;
@@ -67,14 +68,15 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         
         assert (sz > 0);
         size = sz;
-
+        
         if (size == 1)
             HIR_size = 0;
-        else if (size <= 10) 
-            HIR_size = 1;
-        else 
-            HIR_size = (size_t) (size / 10);
-         
+        else {
+            HIR_size = (size_t) (size * HIR_blocks_percentage_coeff);       
+            if (HIR_size == 0) 
+                HIR_size = 1;
+        }
+
         LIR_size = size - HIR_size;
     }
 
@@ -88,7 +90,19 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
 
     int fill_cache (KeyT key, Page_t (*slow_get_page) (KeyT key)) {
         
+        if (size == 1) {
+            if (!LIR_full()) {
+                S_list.push_front ({key, LIR});
+                hash_map.insert ({key, construct_page_structure (key, LIR, S_list.begin(), HIR_list.end(), slow_get_page)});
+
+                return false;
+            }
+
+            return FULL;
+        }
+
         auto hit = hash_map.find (key);
+
         if (hit == hash_map.end ()) {
             
             if (!LIR_full()) {
@@ -148,10 +162,28 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     int update_cache (KeyT key, Page_t (*slow_get_page) (KeyT key)) {
         
         auto hit = hash_map.find (key);
+
+        if (size == 1) {
+            if (hit == hash_map.end()) {
+                auto term = hash_map.find(S_list.front().first);
+                if (term != hash_map.end()) {
+                    delete term->second;
+                    hash_map.erase(term);
+                }
+                S_list.clear();
+
+                S_list.push_front ({key, LIR});
+                hash_map.insert ({key, construct_page_structure (key, LIR, S_list.begin(), HIR_list.end(), slow_get_page)});
+                
+                return false;
+            }
+
+            return true;
+        }
         
         if (hit == hash_map.end()) {  
             
-            auto nonres_HIR_It = non_resident_HIR_hash_map.find(key);
+            auto nonres_HIR_It = non_resident_HIR_hash_map.find (key);
             
             if (nonres_HIR_It == non_resident_HIR_hash_map.end()) {                            /*new*/        
                 S_list.push_front ({key, HIR});
@@ -196,8 +228,8 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
                     S_list.push_front ({key, LIR});
                     hit->second->S_list_iter = S_list.begin();
 
-                    delete_bottom_HIR_block ();
-                    move_bottom_LIR_to_HIR ();                   
+                    move_bottom_LIR_to_HIR (); 
+                    delete_bottom_HIR_block ();                  
                 }
             }
 
@@ -225,7 +257,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     }
 
     
-    Page_status_and_iterators* construct_page_structure (KeyT key, enum Status_ status, List_Iter S_list_It, List_Iter HIR_list_It, Page_t (*slow_get_page)(KeyT key)) {
+    Page_status_and_iterators* construct_page_structure (KeyT key, int status, List_Iter S_list_It, List_Iter HIR_list_It, Page_t (*slow_get_page)(KeyT key)) {
         
         Page_status_and_iterators* Iterator = new Page_status_and_iterators (slow_get_page (key), status, S_list_It, HIR_list_It);
 
@@ -241,7 +273,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         else if (Iterator->second->S_list_iter != S_list.end()) {
 
             KeyT k = Iterator->first;
-            Status_ st = Iterator->second->status;
+            int st = Iterator->second->status;
             
             S_list.erase (Iterator->second->S_list_iter);
             S_list_pruning (); 
@@ -266,7 +298,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         else if (Iterator->second->HIR_list_iter != HIR_list.end()) {
 
             KeyT k = Iterator->first;
-            Status_ st = Iterator->second->status;
+            int st = Iterator->second->status;
             
             HIR_list.erase (Iterator->second->HIR_list_iter); 
 
@@ -364,13 +396,13 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     }
 
 
-    int run_cache (int nKeys, int* arr, Page_t (*slow_get_page) (KeyT key)) {
+    int run_cache (int nKeys, std::vector<int>& key_vect, Page_t (*slow_get_page) (KeyT key)) {
         
         int i = 0, hits = 0, res = 0;
         
         while (i < nKeys) {
             hits += res;
-            res = fill_cache (arr[i++], slow_get_page);
+            res = fill_cache (key_vect[i++], slow_get_page);
 
             
             if (res == FULL)
@@ -388,7 +420,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         i -= 1;
 
         while (i < nKeys) {
-            res = update_cache (arr[i++], slow_get_page);
+            res = update_cache (key_vect[i++], slow_get_page);
 
             if (res == ERROR)
                 return ERROR;
@@ -402,11 +434,11 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
 };
 
 
-int test_cache (size_t cache_size, int nKeys, int* arr) {
+int test_cache (size_t cache_size, int nKeys, std::vector<int>& key_vect) {
 
     cache_t<int> cache {cache_size};
     
-    return cache.run_cache (nKeys, arr, slow_get_page_int);
+    return cache.run_cache (nKeys, key_vect, slow_get_page_int);
 }
 
 }

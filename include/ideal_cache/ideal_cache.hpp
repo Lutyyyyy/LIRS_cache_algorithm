@@ -12,7 +12,7 @@
 
 namespace ideal_cache {
 
-int run_ideal_cache (size_t size, size_t nKeys, int* keys);
+int run_ideal_cache (size_t size, size_t nKeys, std::vector<int>& Keys);
 
 
 template <typename KeyT = int> struct ideal_cache_t {   
@@ -20,90 +20,79 @@ template <typename KeyT = int> struct ideal_cache_t {
     std::unordered_map<KeyT, size_t> ideal_cache_map = {};
     size_t capacity;
 
-    typedef struct distance_info_ {
-        KeyT Key;
-        int distance;
-    } distance_info;
+    using T = typename std::pair <KeyT, size_t>;
+    std::vector<T> dist_vector;
 
 
-    ideal_cache_t (size_t cap) {
-        capacity = cap;
-    }
+    ideal_cache_t (size_t cap) : capacity(cap) {}
 
 
-    distance_info* create_distance_array (size_t nKeys, KeyT* Keys) {
-        
-        distance_info* arr = new distance_info[nKeys];
+    void fill_distance_vector (size_t nKeys, std::vector<KeyT>& Keys) {
 
         for (size_t i = 0; i < nKeys; i++) {
             auto hit = ideal_cache_map.find (Keys[i]);
             
             if (hit == ideal_cache_map.end ()) {
-                arr[i].Key      = Keys[i];
-                arr[i].distance = nKeys - i - 1;
+                dist_vector.push_back({Keys[i], nKeys - i - 1});
                 ideal_cache_map.insert({Keys[i], nKeys - 1 - i});
             }
             else {
-                arr[i].Key = Keys[i];
-                arr[i].distance = nKeys - i - 1;
-                arr[nKeys - 1 - hit->second].distance = i + hit->second - nKeys + 1;
+                dist_vector.push_back({Keys[i], nKeys - i - 1});
+                dist_vector[nKeys - 1 - hit->second].second = i + hit->second - nKeys + 1;
                 hit->second = nKeys - i - 1;
             }
         }
 
         ideal_cache_map.clear();
 
-        return arr;
+        return;
     }
 
 
-    int count_ideal_cache_hits (size_t nKeys, KeyT* keys) {
+    int count_ideal_cache_hits (size_t nKeys, std::vector<KeyT>& Keys) {
 
-        distance_info* arr = create_distance_array (nKeys, keys);
+        fill_distance_vector (nKeys, Keys);
         int hits = 0;
 
         for (size_t i = 0; i < nKeys; i++) {
-            auto hit = ideal_cache_map.find (arr[i].Key);
+            auto hit = ideal_cache_map.find (dist_vector[i].first);
             decrease_dist (ideal_cache_map);
 
             if (hit == ideal_cache_map.end ()) {
                 if (ideal_cache_map.size() < capacity) {
-                    ideal_cache_map.insert ({arr[i].Key, arr[i].distance});
+                    ideal_cache_map.emplace (dist_vector[i]);
                 }
 
                 else {
                     ideal_cache_map.erase (worst_dist_key(ideal_cache_map));
-                    ideal_cache_map.insert ({arr[i].Key, arr[i].distance});
+                    ideal_cache_map.emplace (dist_vector[i]);
                 }
             }
 
             else {
                 hits++;
-                hit->second = arr[i].distance;
+                hit->second = dist_vector[i].second;
             }
         }
 
-        delete[] arr;
         return hits;
     }
 
 
-    void print_dist_arr (size_t nKeys, KeyT* keys) {
+    void print_dist_arr (size_t nKeys, std::vector<KeyT>& Keys) {
 
-        distance_info* arr = create_distance_array (nKeys, keys);
+        fill_distance_vector (nKeys, Keys);
        
         for (size_t i = 0; i < nKeys; i++) 
-            std::cout << arr[i].Key << ' ';
+            std::cout << dist_vector[i].first << ' ';
         
         std::cout << std::endl;
 
         for (size_t i = 0; i < nKeys; i++)
-            std::cout << arr[i].distance << ' ';
+            std::cout << dist_vector[i].second << ' ';
         
         std::cout << std::endl;
 
-
-        delete[] arr;
         return;
     }
 
@@ -134,11 +123,11 @@ template <typename KeyT = int> struct ideal_cache_t {
 };
 
 
-int run_ideal_cache (size_t cache_size, size_t nKeys, int* keys) {
+int run_ideal_cache (size_t cache_size, size_t nKeys, std::vector<int>& Keys) {
    
     ideal_cache_t<int> cache {cache_size};
 
-    return cache.count_ideal_cache_hits(nKeys, keys);
+    return cache.count_ideal_cache_hits(nKeys, Keys);
 }
 
 

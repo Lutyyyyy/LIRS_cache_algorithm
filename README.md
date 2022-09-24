@@ -14,7 +14,7 @@ Prerequisites:
 
 1. Create an empty folder where you want to build your project (e.g. it is called build)
 2. `cd build`
-3. run `cmake . `
+3. run `cmake ..`
 4. run `make` or `cmake --build`
 
 After following this set of instructions all apps cna be found in `build/apps` in each separate directory. 
