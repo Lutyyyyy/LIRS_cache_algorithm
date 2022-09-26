@@ -338,7 +338,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
 
         while (S_list.back().second == HIR) {
             auto bottom = hash_map.find (S_list.back().first);
-            if (bottom != hash_map.end())
+            if (bottom != hash_map.end() && bottom->second->status == HIR)
                 bottom->second->S_list_iter = S_list.end();
 
             auto hit = non_resident_HIR_hash_map.find (S_list.back().first);
@@ -361,6 +361,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         }
 
         else return;
+        
 
         delete non_res_HIR->second;
         hash_map.erase (HIR_list.back().first);
@@ -392,6 +393,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
             else printf (" %3d   LIR    ERROR\n", n.first);
 
         printf ("====================\n");
+
         return;
     }
 
