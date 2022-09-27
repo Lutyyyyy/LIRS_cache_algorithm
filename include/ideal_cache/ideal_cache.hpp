@@ -99,7 +99,7 @@ template <typename KeyT = int> struct ideal_cache_t {
 
     void decrease_dist (std::unordered_map<KeyT, size_t>& map) {
         
-        for (auto n : map) n.second--;
+        for (auto& n : map) n.second--;
 
         return;
     }
@@ -132,3 +132,4 @@ int run_ideal_cache (size_t cache_size, size_t nKeys, std::vector<int>& Keys) {
 
 
 }
+
