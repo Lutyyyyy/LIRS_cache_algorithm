@@ -15,7 +15,7 @@ int slow_get_page_int (int key);
 
 namespace caches {
 
-int test_cache (size_t cache_size, int nKeys, int* arr);
+int test_cache (size_t cache_size, int nKeys, std::vector<int>& arr);
 
 template <typename Page_t, typename KeyT = int> struct cache_t {
     
