@@ -91,7 +91,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     int fill_cache (KeyT key, Page_t (*slow_get_page) (KeyT key)) {
         
         if (size == 1) {
-            if (!LIR_full()) {
+            if (!LIR_full() && !LIR_overflow()) {
                 S_list.push_front ({key, LIR});
                 hash_map.insert ({key, construct_page_structure (key, LIR, S_list.begin(), HIR_list.end(), slow_get_page)});
 
@@ -105,11 +105,11 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
 
         if (hit == hash_map.end ()) {
             
-            if (!LIR_full()) {
+            if (!LIR_full() && !LIR_overflow()) {
                 S_list.push_front ({key, LIR});
                 hash_map.insert ({key, construct_page_structure (key, LIR, S_list.begin(), HIR_list.end(), slow_get_page)});
             }
-            else if (!HIR_full()) {
+            else if (!HIR_full() && !HIR_overflow()) {
                 HIR_list.push_front ({key, HIR});
                 S_list.push_front ({key, HIR});
                 hash_map.insert ({key, construct_page_structure (key, HIR, S_list.begin(), HIR_list.begin(), slow_get_page)});
@@ -201,7 +201,8 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
                 hash_map.insert ({key, construct_page_structure (key, LIR, S_list.begin(), HIR_list.end(), slow_get_page)});
             
                 move_bottom_LIR_to_HIR ();
-                delete_bottom_HIR_block (); 
+                if (HIR_overflow())
+                    delete_bottom_HIR_block (); 
             }
   
             return false;  
@@ -219,7 +220,7 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
                     hit->second->S_list_iter = S_list.begin();            
                 }
 
-                else {                    
+                else {                                     
                     HIR_list.erase (hit->second->HIR_list_iter);
                     hit->second->HIR_list_iter = HIR_list.end();
                     
@@ -228,8 +229,9 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
                     S_list.push_front ({key, LIR});
                     hit->second->S_list_iter = S_list.begin();
 
-                    move_bottom_LIR_to_HIR (); 
-                    delete_bottom_HIR_block ();                  
+                    move_bottom_LIR_to_HIR ();
+                    if (HIR_overflow()) 
+                        delete_bottom_HIR_block (); 
                 }
             }
 
@@ -371,8 +373,10 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
     }
 
 
-    bool LIR_full() const { return (  S_list.size() >= LIR_size); }
-    bool HIR_full() const { return (HIR_list.size() >= HIR_size); }
+    bool LIR_full()     const { return (  S_list.size() == LIR_size); }
+    bool HIR_full()     const { return (HIR_list.size() == HIR_size); }
+    bool LIR_overflow() const { return (  S_list.size() >  LIR_size); }
+    bool HIR_overflow() const { return (HIR_list.size() >  HIR_size); }
 
 
 //functions used to debug============================================
@@ -405,7 +409,6 @@ template <typename Page_t, typename KeyT = int> struct cache_t {
         while (i < nKeys) {
             hits += res;
             res = fill_cache (key_vect[i++], slow_get_page);
-
             
             if (res == FULL)
                 break;
