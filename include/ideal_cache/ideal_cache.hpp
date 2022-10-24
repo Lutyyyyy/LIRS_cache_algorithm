@@ -64,8 +64,11 @@ template <typename KeyT = int> struct ideal_cache_t {
                 }
 
                 else {
-                    ideal_cache_map.erase (worst_dist_key(ideal_cache_map));
-                    ideal_cache_map.emplace (dist_vector[i]);
+                    auto worst = ideal_cache_map.find (worst_dist_key(ideal_cache_map));
+                    if (worst != ideal_cache_map.end() && dist_vector[i].second < worst->second) {
+                            ideal_cache_map.erase (worst_dist_key(ideal_cache_map));
+                            ideal_cache_map.emplace (dist_vector[i]);
+                    }
                 }
             }
 
